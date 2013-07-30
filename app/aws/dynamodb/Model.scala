@@ -11,14 +11,17 @@ import ExecutionContext.Implicits.global
 
 trait Model[A] extends Table[A] {
 
-  def logConsumed(consumed:ConsumedCapacity) {}
+  private def logConsumed(consumed:ConsumedCapacity) {}
 
-  def logMetrics(metrics:ItemCollectionMetrics) {}
+  private def logMetrics(metrics:ItemCollectionMetrics) {}
 
   def getItem(id:Any,attributes:List[String] = Nil)(implicit config:Config): Future[Option[A]] = {
 
     val key = Key from("id", id)
     var request = new GetItemRequest() withTableName table withKey key
+
+    if(config.watchCapacity)
+      request = request withReturnConsumedCapacity "TOTAL"
 
     if(attributes.length > 0)
       request = request withAttributesToGet attributes
@@ -34,7 +37,14 @@ trait Model[A] extends Table[A] {
 
   def putItem(item:JavaMap[String,AttributeValue])(implicit config:Config): Future[Option[A]] = {
 
-    val request = new PutItemRequest() withTableName table withItem item
+    var request = new PutItemRequest() withTableName table withItem item withReturnValues "ALL_NEW"
+
+    if(config.watchMetrics)
+      request = request withReturnItemCollectionMetrics "SIZE"
+
+    if(config.watchCapacity)
+      request = request withReturnConsumedCapacity "TOTAL"
+
     val result = Future { config.client.putItem(request) }
 
     result.map {
@@ -48,7 +58,14 @@ trait Model[A] extends Table[A] {
   def deleteItem(id:Any)(implicit config:Config): Future[Option[A]] = {
 
     val key = Key from("id", id)
-    val request = new DeleteItemRequest() withTableName table withKey key
+    var request = new DeleteItemRequest() withTableName table withKey key withReturnValues "ALL_OLD"
+
+    if(config.watchMetrics)
+      request = request withReturnItemCollectionMetrics "SIZE"
+
+    if(config.watchCapacity)
+      request = request withReturnConsumedCapacity "TOTAL"
+
     val result = Future { config.client.deleteItem(request) }
 
     result.map {
@@ -62,7 +79,14 @@ trait Model[A] extends Table[A] {
   def updateItem(id:Any,attributes:JavaMap[String,AttributeValueUpdate])(implicit config:Config): Future[Option[A]] = {
 
     val key = Key from("id", id)
-    var request = new UpdateItemRequest() withTableName table withKey key withAttributeUpdates attributes
+    var request = new UpdateItemRequest() withTableName table withKey key withAttributeUpdates attributes withReturnValues "ALL_NEW"
+
+    if(config.watchMetrics)
+      request = request withReturnItemCollectionMetrics "SIZE"
+
+    if(config.watchCapacity)
+      request = request withReturnConsumedCapacity "TOTAL"
+
     val result = Future { config.client.updateItem(request) }
 
     result.map {
