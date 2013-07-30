@@ -10,16 +10,16 @@ case class Where(conditions:JavaMap[String, Condition] = new HashMap[String,Cond
     this
   }
 
-  def greaterThan(name:String,value:_) =
+  def greaterThan(name:String,value:Any) =
     Where.greaterThan(name, value, Some(this))
 
-  def lessThan(name:String,value:_) =
+  def lessThan(name:String,value:Any) =
     Where.lessThan(name, value, Some(this))
 
-  def equalTo(name:String,value:_) =
+  def equalTo(name:String,value:Any) =
     Where.equalTo(name, value, Some(this))
 
-  def is(name:String,operator:ComparisonOperator,value:_):Where =
+  def is(name:String,operator:ComparisonOperator,value:Any):Where =
     Where.is(name,operator, value, Some(this))
 
 }
@@ -27,13 +27,13 @@ case class Where(conditions:JavaMap[String, Condition] = new HashMap[String,Cond
 object Where {
 
 
-  def greaterThan(name:String,value:_,state:Option[Where] = None) = is(name,ComparisonOperator.GT, value, state)
+  def greaterThan(name:String,value:Any,state:Option[Where] = None) = is(name,ComparisonOperator.GT, value, state)
 
-  def lessThan(name:String,value:_,state:Option[Where] = None) = is(name,ComparisonOperator.LT, value, state)
+  def lessThan(name:String,value:Any,state:Option[Where] = None) = is(name,ComparisonOperator.LT, value, state)
 
-  def equalTo(name:String,value:_,state:Option[Where] = None) = is(name,ComparisonOperator.EQ, value, state)
+  def equalTo(name:String,value:Any,state:Option[Where] = None) = is(name,ComparisonOperator.EQ, value, state)
 
-  def is(name:String,operator:ComparisonOperator,value:_,state:Option[Where] = None):Where = {
+  def is(name:String,operator:ComparisonOperator,value:Any,state:Option[Where] = None):Where = {
 
     val newCondition = new Condition()
       .withComparisonOperator(operator.toString)

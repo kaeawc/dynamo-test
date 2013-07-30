@@ -2,6 +2,7 @@ package aws.dynamodb
 
 import java.util.{HashMap,Map => JavaMap}
 import scala.collection.JavaConversions._
+import scala.language.implicitConversions
 import com.amazonaws.services.dynamodbv2.model._
 import com.amazonaws.services.dynamodbv2.model.AttributeValue
 
@@ -10,10 +11,7 @@ trait Model[A] {
   def nextId:JavaMap[String,AttributeValue]
   val table:String
 
-  def getById(id:_):Option[A] =
-    getItem(id).getItem
-
-  def getItem(id:_,attributes:List[String] = Nil)(implicit config:Config): GetItemResult = {
+  def getItem(id:Any,attributes:List[String] = Nil)(implicit config:Config): GetItemResult = {
 
     val key = Key from("id", id)
     val request = new GetItemRequest() withTableName table withKey key
@@ -31,7 +29,7 @@ trait Model[A] {
     config.client.putItem(request)
   }
 
-  def deleteItem(id:_)(implicit config:Config): DeleteItemResult = {
+  def deleteItem(id:Any)(implicit config:Config): DeleteItemResult = {
 
     val key = Key from("id", id)
     var request = new DeleteItemRequest() withTableName table withKey key
@@ -39,7 +37,7 @@ trait Model[A] {
     config.client.deleteItem(request)
   }
 
-  def updateItem(id:_,attributes:JavaMap[String,AttributeValueUpdate])(implicit config:Config): UpdateItemResult = {
+  def updateItem(id:Any,attributes:JavaMap[String,AttributeValueUpdate])(implicit config:Config): UpdateItemResult = {
 
     val key = Key from("id", id)
     var request = new UpdateItemRequest() withTableName table withKey key withAttributeUpdates attributes

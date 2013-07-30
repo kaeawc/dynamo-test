@@ -6,7 +6,7 @@ import java.util.{HashMap,Map => JavaMap}
 
 trait Field {
 
-  def from(name:String,value:_):JavaMap[String,AttributeValue] =
+  def from(name:String,value:Any):JavaMap[String,AttributeValue] =
     value match {
       case value:String => S(name,value)
       case value:Long => N(name,value)

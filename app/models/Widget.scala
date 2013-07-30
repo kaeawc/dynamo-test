@@ -5,6 +5,7 @@ import play.api.libs.json._
 import com.amazonaws.services.dynamodbv2.model._
 import java.util.{Map => JavaMap, Date}
 import scala.collection.JavaConversions._
+import scala.language.implicitConversions
 import aws.dynamodb._
 
 case class Widget(
@@ -14,6 +15,7 @@ case class Widget(
 )
 
 object Widget extends ((String,String,Date) => Widget) with Model[Widget] {
+
 
   implicit val r = Json.reads[Widget]
   implicit val w = Json.writes[Widget]
@@ -31,6 +33,10 @@ object Widget extends ((String,String,Date) => Widget) with Model[Widget] {
       case e:Exception => None
     }
   }
+
+  implicit def config = Config()
+
+  def getById(id:Any):Option[Widget] = getItem(id).getItem
 
   def create(name:String) = putItem(Widget(Value.guid,name,new Date()))
 

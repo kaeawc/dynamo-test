@@ -9,7 +9,7 @@ object Value {
 
   val df = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'")
 
-  def from(value:_):AttributeValue =
+  def from(value:Any):AttributeValue =
     value match {
       case value:Date => S(df.format(value))
       case value:String => S(value)
