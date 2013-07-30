@@ -9,11 +9,7 @@ import scala.language.implicitConversions
 import scala.language.postfixOps
 import ExecutionContext.Implicits.global
 
-trait Model[A] {
-
-  def nextId:JavaMap[String,AttributeValue]
-  val table:String
-  val keyName:String
+trait Model[A] extends Table[A] {
 
   def logConsumed(consumed:ConsumedCapacity) {}
 
@@ -77,16 +73,41 @@ trait Model[A] {
     }
   }
 
-  def scanItems(attributes:List[String] = Nil,startKey:AttributeValue = null)(implicit config:Config): Future[List[A]] = {
+  def scanItems(conditions:JavaMap[String,Condition] = new HashMap[String,Condition],attributes:List[String] = Nil,startKey:(AttributeValue,AttributeValue) = null)(implicit config:Config): Future[List[A]] = {
 
-    var request = new ScanRequest() withTableName table withAttributesToGet attributes
+    var request = new ScanRequest() withTableName table
+
+    if(!conditions.isEmpty) {
+
+      for ((key, value) <- conditions)
+        verifyField(key)
+
+      request = request.withScanFilter(conditions)
+    }
+
+    if(!attributes.isEmpty)
+      request = request withAttributesToGet attributes
+
+    if(startKey != null) {
+      val (hashStart,rangeStart) = startKey
+      request = request withExclusiveStartKey Map(
+        keyName   -> hashStart,
+        rangeName -> rangeStart
+      )
+    }
+
+    if(config.watchCapacity)
+      request = request withReturnConsumedCapacity("TOTAL")
+
     val result = Future { config.client.scan(request) }
 
     result.map {
       scanned =>
         logConsumed(scanned.getConsumedCapacity)
 
-        lazy val next = Await.result(scanItems(attributes, scanned.getLastEvaluatedKey.get(keyName)), 1 second)
+        val lastKey = scanned.getLastEvaluatedKey
+        val continue = (lastKey.get(keyName),lastKey.get(rangeName))
+        lazy val next = Await.result(scanItems(conditions, attributes, continue), 1 second)
 
         scanned.getItems.foldLeft(List[A]()) {
           (a,b) => a ++ readDynamo(b)
@@ -98,22 +119,25 @@ trait Model[A] {
 
     var request = new QueryRequest().withTableName(table)
 
-    for (condition <- conditions) {
-      val (key,value) = condition
-      value.getComparisonOperator match {
-      	case "NE"           => throw new Exception("Cannot query by NE on " + key + ", condition operator is not supported.")
-      	case "NOT_NULL"     => throw new Exception("Cannot query by NOT_NULL on " + key + ", condition operator is not supported.")
-      	case "NULL"         => throw new Exception("Cannot query by NULL on " + key + ", condition operator is not supported.")
-      	case "CONTAINS"     => throw new Exception("Cannot query by CONTAINS on " + key + ", condition operator is not supported.")
-      	case "NOT_CONTAINS" => throw new Exception("Cannot query by NOT_CONTAINS on " + key + ", condition operator is not supported.")
-      	case "IN"           => throw new Exception("Cannot query by IN on " + key + ", condition operator is not supported.")
-      	case _ => {}
+    if(!conditions.isEmpty) {
+
+      for ((key, value) <- conditions) {
+
+        value.getComparisonOperator match {
+          case "NE"           => throw new Exception("Cannot query by NE on " + key + ", condition operator is not supported.")
+          case "NOT_NULL"     => throw new Exception("Cannot query by NOT_NULL on " + key + ", condition operator is not supported.")
+          case "NULL"         => throw new Exception("Cannot query by NULL on " + key + ", condition operator is not supported.")
+          case "CONTAINS"     => throw new Exception("Cannot query by CONTAINS on " + key + ", condition operator is not supported.")
+          case "NOT_CONTAINS" => throw new Exception("Cannot query by NOT_CONTAINS on " + key + ", condition operator is not supported.")
+          case "IN"           => throw new Exception("Cannot query by IN on " + key + ", condition operator is not supported.")
+          case _ => {}
+        }
+
+        verifyField(key)
       }
-    }
 
-    if(!conditions.isEmpty)
       request = request.withKeyConditions(conditions)
-
+    }
 
     if(!attributes.isEmpty)
       request = request.withAttributesToGet(attributes)
@@ -138,14 +162,17 @@ trait Model[A] {
     }
   }
 
-  implicit def readDynamo(attributes: JavaMap[String, AttributeValue]):Option[A]
+  def verifyField(name:String) {
+    try {
+      // TODO: Figure out a way to test for a class's fields without an instance
+      // scala.reflect.ClassManifestFactory.classType(clazz = Class[A]).getClass.getField(name)
+    } catch {
+      case e:Exception => {
 
-  implicit def writeDynamo(item:A):JavaMap[String, AttributeValue] = {
-    (Map[String, AttributeValue]() /: item.getClass.getDeclaredFields) {
-      (a, f) =>
-      f.setAccessible(true)
-      a + (f.getName -> Value.from(f.get(item)))
+        // TODO: describe table, if the field exists its fine otherwise throw the exception.
+
+        throw new Exception("Can't query on condition on field that doesn't exist.")
+      }
     }
   }
-
 }
